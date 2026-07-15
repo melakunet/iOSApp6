@@ -6,27 +6,25 @@
 //
 
 import SwiftUI
-import SwiftData
+import FirebaseCore
+import FirebaseAuth
 
 @main
 struct iOSApp6App: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
+    // Configure Firebase when the app launches
+    init() {
+        FirebaseApp.configure()
+
+        // Sign in anonymously so each device gets its own user ID
+        if Auth.auth().currentUser == nil {
+            Auth.auth().signInAnonymously()
         }
-    }()
+    }
 
     var body: some Scene {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(sharedModelContainer)
     }
 }
