@@ -11,9 +11,18 @@ struct ContentView: View {
     var body: some View {
         if showMain {
             // Placeholder until the real Markets screen is built
-            Text("Markets coming soon")
-                .font(.title2)
-                .foregroundStyle(.secondary)
+            ZStack {
+                LinearGradient(
+                    colors: [.black, Color.indigo],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+
+                Text("Markets coming soon")
+                    .font(.title2)
+                    .foregroundStyle(.white)
+            }
         } else {
             // Pass a closure so LandingView can trigger the transition
             LandingView {
