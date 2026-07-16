@@ -10,8 +10,6 @@ struct WatchlistView: View {
 
     // Full coin data used to show live prices next to each watchlist item
     @State private var coins: [Coin] = []
-    // True while the coin list is being fetched
-    @State private var isLoading = false
 
     // Finds the live Coin for a watchlist item so prices can be displayed
     private func liveCoin(for item: WatchlistItem) -> Coin? {
@@ -115,11 +113,9 @@ struct WatchlistView: View {
 
     // Fetches the top 100 coins to populate live prices for each watchlist row
     private func loadCoins() async {
-        isLoading = true
         do {
             coins = try await CoinService.shared.fetchTopCoins()
         } catch { }
-        isLoading = false
     }
 }
 

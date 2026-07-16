@@ -3,6 +3,22 @@
 
 import Foundation
 
+// Time ranges available for the price chart
+enum ChartRange: String, CaseIterable {
+    case day   = "1"
+    case week  = "7"
+    case month = "30"
+
+    // Short label shown in the segmented picker
+    var label: String {
+        switch self {
+        case .day:   return "1D"
+        case .week:  return "1W"
+        case .month: return "1M"
+        }
+    }
+}
+
 // Shared network service for all CoinGecko API calls
 final class CoinService {
 
@@ -26,13 +42,16 @@ final class CoinService {
         let url = URL(string: urlString)!
         let (data, response) = try await URLSession.shared.data(from: url)
         try validateResponse(response)
-        return try decoder.decode([Coin].self, from: data)
+        // Decode each element individually so one coin with missing fields
+        // does not cause the entire list to fail
+        let wrapped = try decoder.decode([FailableCoin].self, from: data)
+        return wrapped.compactMap { $0.value }
     }
 
-    // Fetches 7-day price history for a given coin and converts it to PricePoint values
-    func fetchChart(coinId: String) async throws -> [PricePoint] {
+    // Fetches price history for a given coin over the requested time range
+    func fetchChart(coinId: String, range: ChartRange = .week) async throws -> [PricePoint] {
         let urlString = "https://api.coingecko.com/api/v3/coins/\(coinId)" +
-                        "/market_chart?vs_currency=usd&days=7"
+                        "/market_chart?vs_currency=usd&days=\(range.rawValue)"
         let url = URL(string: urlString)!
         let (data, response) = try await URLSession.shared.data(from: url)
         try validateResponse(response)
@@ -57,4 +76,12 @@ final class CoinService {
 // Used only to decode the top-level chart JSON structure
 private struct ChartResponse: Decodable {
     let prices: [[Double]]  // each element is [timestamp_ms, price]
+}
+
+// Wraps a single Coin decode attempt so a bad element skips instead of crashing the list
+private struct FailableCoin: Decodable {
+    let value: Coin?
+    init(from decoder: Decoder) throws {
+        value = try? Coin(from: decoder)
+    }
 }

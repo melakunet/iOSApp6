@@ -14,4 +14,18 @@ struct Coin: Identifiable, Codable, Hashable {
     let priceChangePercentage24h: Double?  // 24-hour price change as a percentage
     let high24h: Double?                   // 24-hour high price in USD
     let low24h: Double?                    // 24-hour low price in USD
+
+    // Explicit keys map exact JSON field names so decoding never depends on
+    // convertFromSnakeCase, which would wrongly capitalise the "h" in "24h"
+    enum CodingKeys: String, CodingKey {
+        case id
+        case symbol
+        case name
+        case image
+        case currentPrice             = "current_price"
+        case marketCap                = "market_cap"
+        case priceChangePercentage24h = "price_change_percentage_24h"
+        case high24h                  = "high_24h"
+        case low24h                   = "low_24h"
+    }
 }

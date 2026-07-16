@@ -1,17 +1,17 @@
 // CoinDetailView.swift
-// CoinWatch — detail screen for a single coin with a 7-day price chart
+// CoinWatch — detail screen with interactive scrubbing chart and range picker
 
 import SwiftUI
 import Charts
 
-// Shows detailed price info, a 7-day chart, and key stats for one coin
+// Shows detailed price info, a scrubable price chart, and key stats for one coin
 struct CoinDetailView: View {
     let coin: Coin
 
     // Shared watchlist passed down from the app root via the environment
     @EnvironmentObject var watchlist: WatchlistService
 
-    // 7-day chart data fetched from CoinGecko
+    // Chart price data for the selected time range
     @State private var chartPoints: [PricePoint] = []
     // True while chart data is loading
     @State private var isLoading = false
@@ -19,14 +19,23 @@ struct CoinDetailView: View {
     @State private var errorMessage: String?
     // Scale used to give the star button a spring bounce on tap
     @State private var starScale: CGFloat = 1.0
+    // Currently selected time range for the chart
+    @State private var selectedRange: ChartRange = .week
+    // The chart point the user is currently dragging over, or nil when not scrubbing
+    @State private var selectedPoint: PricePoint?
 
-    // Line color: green if 7-day price went up, red if it went down
+    // Shows the scrubbed price while dragging, otherwise the coin's live price
+    private var displayPrice: Double {
+        selectedPoint?.price ?? coin.currentPrice
+    }
+
+    // Line color: green if the visible range went up overall, red if it went down
     private var chartColor: Color {
         guard let first = chartPoints.first, let last = chartPoints.last else { return .blue }
         return last.price >= first.price ? .green : .red
     }
 
-    // Y-axis range with padding so the line fills the chart instead of starting from zero
+    // Y-axis bounds with padding so the line fills the chart instead of starting from zero
     private var priceRange: ClosedRange<Double> {
         guard let min = chartPoints.map(\.price).min(),
               let max = chartPoints.map(\.price).max() else { return 0...1 }
@@ -51,8 +60,12 @@ struct CoinDetailView: View {
             }
         }
         .task {
-            // Load 7-day chart data when the view appears
+            // Load chart data when the view first appears
             await loadChart()
+        }
+        .onChange(of: selectedRange) {
+            // Reload whenever the user picks a different range
+            Task { await loadChart() }
         }
     }
 
@@ -60,21 +73,12 @@ struct CoinDetailView: View {
     private var starButton: some View {
         let watched = watchlist.isWatched(coin.id)
         return Button {
-            // Bounce the icon then toggle
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.4)) {
-                starScale = 1.5
-            }
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.4)) { starScale = 1.5 }
             Task {
                 try? await Task.sleep(nanoseconds: 150_000_000)
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                    starScale = 1.0
-                }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { starScale = 1.0 }
             }
-            if watched {
-                watchlist.remove(coinId: coin.id)
-            } else {
-                watchlist.add(coin: coin)
-            }
+            if watched { watchlist.remove(coinId: coin.id) } else { watchlist.add(coin: coin) }
         } label: {
             Image(systemName: watched ? "star.fill" : "star")
                 .foregroundStyle(watched ? .yellow : .primary)
@@ -82,7 +86,7 @@ struct CoinDetailView: View {
         }
     }
 
-    // Header: icon, name, symbol, current price, and 24h change
+    // Header: icon, name, symbol, live/scrubbed price, and 24h change
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
@@ -102,11 +106,11 @@ struct CoinDetailView: View {
                     .foregroundStyle(.secondary)
             }
 
-            // Large price display
-            Text(coin.currentPrice, format: .currency(code: "USD"))
+            // Switches to the scrubbed price while the user drags on the chart
+            Text(displayPrice, format: .currency(code: "USD"))
                 .font(.system(size: 34, weight: .bold))
+                .contentTransition(.numericText())
 
-            // 24h change with direction arrow
             priceChangeLabel
         }
     }
@@ -129,43 +133,123 @@ struct CoinDetailView: View {
         }
     }
 
-    // Chart section: spinner while loading, error message, or the line chart
+    // Range picker and chart content (spinner, error, or interactive chart)
     @ViewBuilder
     private var chartSection: some View {
-        if isLoading {
-            ProgressView()
-                .frame(maxWidth: .infinity, minHeight: 220)
-        } else if let message = errorMessage {
-            Text(message)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, minHeight: 220)
-        } else if !chartPoints.isEmpty {
-            Chart {
-                ForEach(chartPoints) { point in
-                    // Line connecting all price points
-                    LineMark(
-                        x: .value("Date", point.date),
-                        y: .value("Price", point.price)
-                    )
-                    .foregroundStyle(chartColor)
-
-                    // Gradient fill below the line
-                    AreaMark(
-                        x: .value("Date", point.date),
-                        y: .value("Price", point.price)
-                    )
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [chartColor.opacity(0.25), .clear],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
+        VStack(spacing: 12) {
+            // Segmented picker to switch between 1D, 1W, and 1M
+            Picker("Range", selection: $selectedRange) {
+                ForEach(ChartRange.allCases, id: \.self) { range in
+                    Text(range.label).tag(range)
                 }
             }
-            .chartYScale(domain: priceRange)
-            .frame(height: 220)
+            .pickerStyle(.segmented)
+
+            if isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, minHeight: 220)
+            } else if let message = errorMessage {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 220)
+            } else if !chartPoints.isEmpty {
+                Chart {
+                    // Line and gradient fill for the price series
+                    ForEach(chartPoints) { point in
+                        LineMark(
+                            x: .value("Date", point.date),
+                            y: .value("Price", point.price)
+                        )
+                        .foregroundStyle(chartColor)
+
+                        AreaMark(
+                            x: .value("Date", point.date),
+                            y: .value("Price", point.price)
+                        )
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [chartColor.opacity(0.25), .clear],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                    }
+
+                    // Vertical rule, dot, and annotation card shown while scrubbing
+                    if let point = selectedPoint {
+                        RuleMark(x: .value("Selected", point.date))
+                            .foregroundStyle(Color.gray.opacity(0.5))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                            .annotation(
+                                position: .top,
+                                alignment: .center,
+                                spacing: 4,
+                                overflowResolution: .init(x: .fit(to: .chart), y: .disabled)
+                            ) {
+                                scrubAnnotationCard(point: point)
+                            }
+
+                        PointMark(
+                            x: .value("Date", point.date),
+                            y: .value("Price", point.price)
+                        )
+                        .foregroundStyle(chartColor)
+                        .symbolSize(60)
+                    }
+                }
+                .chartYScale(domain: priceRange)
+                .frame(height: 220)
+                .chartOverlay { proxy in
+                    GeometryReader { geo in
+                        Rectangle()
+                            .fill(Color.clear)
+                            .contentShape(Rectangle())
+                            .gesture(
+                                DragGesture(minimumDistance: 0)
+                                    .onChanged { value in
+                                        guard let anchor = proxy.plotFrame else { return }
+                                        let plotFrame = geo[anchor]
+                                        let x = value.location.x - plotFrame.origin.x
+                                        guard x >= 0, x <= plotFrame.width else { return }
+                                        if let date: Date = proxy.value(atX: x) {
+                                            selectedPoint = nearestPoint(to: date)
+                                        }
+                                    }
+                                    .onEnded { _ in
+                                        withAnimation(.easeOut(duration: 0.15)) {
+                                            selectedPoint = nil
+                                        }
+                                    }
+                            )
+                    }
+                }
+            }
+        }
+    }
+
+    // Small card shown above the selected point with price and formatted date
+    private func scrubAnnotationCard(point: PricePoint) -> some View {
+        VStack(spacing: 2) {
+            Text(point.price, format: .currency(code: "USD"))
+                .font(.caption.bold())
+            // 1D shows time; 1W and 1M show date only
+            Text(selectedRange == .day
+                 ? point.date.formatted(.dateTime.month(.abbreviated).day().hour().minute())
+                 : point.date.formatted(.dateTime.month(.abbreviated).day()))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color(.systemGray5))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    // Returns the chart point whose date is closest to the given date
+    private func nearestPoint(to date: Date) -> PricePoint? {
+        chartPoints.min {
+            abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date))
         }
     }
 
@@ -214,12 +298,13 @@ struct CoinDetailView: View {
         }
     }
 
-    // Fetches the 7-day price chart for this coin from CoinGecko
+    // Fetches chart data for the selected range and clears any active scrub point
     private func loadChart() async {
         isLoading = true
         errorMessage = nil
+        selectedPoint = nil
         do {
-            chartPoints = try await CoinService.shared.fetchChart(coinId: coin.id)
+            chartPoints = try await CoinService.shared.fetchChart(coinId: coin.id, range: selectedRange)
         } catch {
             errorMessage = error.localizedDescription
         }

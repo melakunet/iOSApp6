@@ -21,7 +21,7 @@ struct MainTabView: View {
                 .tabItem {
                     Label("Watchlist", systemImage: "star.fill")
                 }
-                .badge(watchlist.items.count > 0 ? watchlist.items.count : 0)
+                .badge(watchlist.items.count)
         }
     }
 }
