@@ -10,19 +10,8 @@ struct ContentView: View {
 
     var body: some View {
         if showMain {
-            // Placeholder until the real Markets screen is built
-            ZStack {
-                LinearGradient(
-                    colors: [Color(red: 0.05, green: 0.0, blue: 0.2), Color.indigo],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-
-                Text("Markets coming soon")
-                    .font(.title2)
-                    .foregroundStyle(.white)
-            }
+            // Markets screen showing live coin prices
+            CoinListView()
         } else {
             // Pass a closure so LandingView can trigger the transition
             LandingView {
