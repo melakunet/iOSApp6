@@ -10,6 +10,8 @@ struct WatchlistView: View {
 
     // Full coin data used to show live prices next to each watchlist item
     @State private var coins: [Coin] = []
+    // Error message shown as a banner if the live price fetch fails
+    @State private var priceLoadError: String?
 
     // Finds the live Coin for a watchlist item so prices can be displayed
     private func liveCoin(for item: WatchlistItem) -> Coin? {
@@ -28,6 +30,23 @@ struct WatchlistView: View {
                     )
                 } else {
                     List {
+                        // Error banner shown when live prices could not be fetched
+                        if let error = priceLoadError {
+                            Section {
+                                HStack {
+                                    Text(error)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    Button("Retry") {
+                                        Task { await loadCoins(forceRefresh: true) }
+                                    }
+                                    .font(.caption)
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
+                                }
+                            }
+                        }
                         ForEach(watchlist.items) { item in
                             watchlistRow(for: item)
                                 .swipeActions(edge: .trailing) {
@@ -41,7 +60,8 @@ struct WatchlistView: View {
                         }
                     }
                     .refreshable {
-                        await loadCoins()
+                        // Force a fresh network request even if the cache is still warm
+                        await loadCoins(forceRefresh: true)
                     }
                 }
             }
@@ -112,10 +132,14 @@ struct WatchlistView: View {
     }
 
     // Fetches the top 100 coins to populate live prices for each watchlist row
-    private func loadCoins() async {
+    // Pass forceRefresh: true to bypass the cache (used by pull-to-refresh and Retry)
+    private func loadCoins(forceRefresh: Bool = false) async {
+        priceLoadError = nil
         do {
-            coins = try await CoinService.shared.fetchTopCoins()
-        } catch { }
+            coins = try await CoinService.shared.fetchTopCoins(forceRefresh: forceRefresh)
+        } catch {
+            priceLoadError = error.localizedDescription
+        }
     }
 }
 

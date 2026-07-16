@@ -6,7 +6,7 @@ import Charts
 
 // Shows detailed price info, a scrubable price chart, and key stats for one coin
 struct CoinDetailView: View {
-    let coin: Coin
+    let coin: Coin  // the coin whose chart and stats this screen shows
 
     // Shared watchlist passed down from the app root via the environment
     @EnvironmentObject var watchlist: WatchlistService
@@ -149,10 +149,19 @@ struct CoinDetailView: View {
                 ProgressView()
                     .frame(maxWidth: .infinity, minHeight: 220)
             } else if let message = errorMessage {
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 220)
+                // Error state: friendly message and a retry button to try again immediately
+                VStack(spacing: 12) {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button("Retry") {
+                        Task { await loadChart(forceRefresh: true) }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
+                .frame(maxWidth: .infinity, minHeight: 220)
             } else if !chartPoints.isEmpty {
                 Chart {
                     // Line and gradient fill for the price series
@@ -299,12 +308,15 @@ struct CoinDetailView: View {
     }
 
     // Fetches chart data for the selected range and clears any active scrub point
-    private func loadChart() async {
+    // Pass forceRefresh: true (e.g. Retry button) to bypass the 60-second cache
+    private func loadChart(forceRefresh: Bool = false) async {
         isLoading = true
         errorMessage = nil
         selectedPoint = nil
         do {
-            chartPoints = try await CoinService.shared.fetchChart(coinId: coin.id, range: selectedRange)
+            chartPoints = try await CoinService.shared.fetchChart(
+                coinId: coin.id, range: selectedRange, forceRefresh: forceRefresh
+            )
         } catch {
             errorMessage = error.localizedDescription
         }

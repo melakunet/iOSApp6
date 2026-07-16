@@ -53,7 +53,8 @@ struct CoinListView: View {
                         prompt: "Search coins"
                     )
                     .refreshable {
-                        await loadCoins()
+                        // Force a fresh network request even if the cache is still warm
+                        await loadCoins(forceRefresh: true)
                     }
                 }
             }
@@ -69,11 +70,12 @@ struct CoinListView: View {
     }
 
     // Fetches the top 100 coins and updates state; shows a spinner only on the first load
-    private func loadCoins() async {
+    // Pass forceRefresh: true to bypass the 60-second cache (used by pull-to-refresh)
+    private func loadCoins(forceRefresh: Bool = false) async {
         isLoading = coins.isEmpty
         errorMessage = nil
         do {
-            coins = try await CoinService.shared.fetchTopCoins()
+            coins = try await CoinService.shared.fetchTopCoins(forceRefresh: forceRefresh)
         } catch {
             errorMessage = error.localizedDescription
         }

@@ -5,7 +5,7 @@ import SwiftUI
 
 // Displays one coin in the Markets list: icon, name, price, and 24h change
 struct CoinRowView: View {
-    let coin: Coin
+    let coin: Coin  // the coin whose data this row displays
 
     var body: some View {
         HStack(spacing: 12) {

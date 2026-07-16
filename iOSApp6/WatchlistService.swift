@@ -33,6 +33,7 @@ final class WatchlistService: ObservableObject {
         }
     }
 
+    // Removes the Firestore listener and any pending auth listener when the service is released
     deinit {
         listener?.remove()
         if let handle = authHandle {
