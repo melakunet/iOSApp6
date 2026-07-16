@@ -43,7 +43,9 @@ struct CoinListView: View {
                 } else {
                     // Coin list with search and pull-to-refresh
                     List(filteredCoins) { coin in
-                        CoinRowView(coin: coin)
+                        NavigationLink(value: coin) {
+                            CoinRowView(coin: coin)
+                        }
                     }
                     .searchable(
                         text: $searchText,
@@ -56,6 +58,9 @@ struct CoinListView: View {
                 }
             }
             .navigationTitle("Markets")
+            .navigationDestination(for: Coin.self) { coin in
+                CoinDetailView(coin: coin)
+            }
             .task {
                 // Fetch coins once when the view first appears
                 await loadCoins()
