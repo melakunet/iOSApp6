@@ -1,9 +1,5 @@
-//
-//  iOSApp6App.swift
-//  iOSApp6
-//
-//  Created by Etefworkie Melaku on 2026-07-15.
-//
+// iOSApp6App.swift
+// CoinWatch — app entry point, Firebase setup, and environment injection
 
 import SwiftUI
 import FirebaseCore
@@ -11,6 +7,8 @@ import FirebaseAuth
 
 @main
 struct iOSApp6App: App {
+    // Single WatchlistService instance shared across all views via the environment
+    @StateObject private var watchlist = WatchlistService()
 
     // Configure Firebase when the app launches
     init() {
@@ -25,6 +23,7 @@ struct iOSApp6App: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(watchlist)
         }
     }
 }

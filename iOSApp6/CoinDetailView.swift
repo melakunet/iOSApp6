@@ -8,12 +8,17 @@ import Charts
 struct CoinDetailView: View {
     let coin: Coin
 
+    // Shared watchlist passed down from the app root via the environment
+    @EnvironmentObject var watchlist: WatchlistService
+
     // 7-day chart data fetched from CoinGecko
     @State private var chartPoints: [PricePoint] = []
     // True while chart data is loading
     @State private var isLoading = false
     // Holds an error message if the chart fetch fails
     @State private var errorMessage: String?
+    // Scale used to give the star button a spring bounce on tap
+    @State private var starScale: CGFloat = 1.0
 
     // Line color: green if 7-day price went up, red if it went down
     private var chartColor: Color {
@@ -40,9 +45,40 @@ struct CoinDetailView: View {
         }
         .navigationTitle(coin.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                starButton
+            }
+        }
         .task {
             // Load 7-day chart data when the view appears
             await loadChart()
+        }
+    }
+
+    // Star button that toggles the watchlist state with a spring bounce animation
+    private var starButton: some View {
+        let watched = watchlist.isWatched(coin.id)
+        return Button {
+            // Bounce the icon then toggle
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.4)) {
+                starScale = 1.5
+            }
+            Task {
+                try? await Task.sleep(nanoseconds: 150_000_000)
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    starScale = 1.0
+                }
+            }
+            if watched {
+                watchlist.remove(coinId: coin.id)
+            } else {
+                watchlist.add(coin: coin)
+            }
+        } label: {
+            Image(systemName: watched ? "star.fill" : "star")
+                .foregroundStyle(watched ? .yellow : .primary)
+                .scaleEffect(starScale)
         }
     }
 
@@ -204,5 +240,6 @@ struct CoinDetailView: View {
             high24h: 66500,
             low24h: 63200
         ))
+        .environmentObject(WatchlistService())
     }
 }
