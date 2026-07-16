@@ -27,12 +27,8 @@ final class CoinService {
 
     private init() {}
 
-    // Decoder configured to convert snake_case JSON keys to camelCase Swift properties
-    private let decoder: JSONDecoder = {
-        let d = JSONDecoder()
-        d.keyDecodingStrategy = .convertFromSnakeCase
-        return d
-    }()
+    // Plain decoder — Coin uses explicit CodingKeys so no strategy is needed
+    private let decoder = JSONDecoder()
 
     // Fetches the top 100 coins by market cap from CoinGecko
     func fetchTopCoins() async throws -> [Coin] {
@@ -45,7 +41,13 @@ final class CoinService {
         // Decode each element individually so one coin with missing fields
         // does not cause the entire list to fail
         let wrapped = try decoder.decode([FailableCoin].self, from: data)
-        return wrapped.compactMap { $0.value }
+        let coins = wrapped.compactMap { $0.value }
+        // If every element silently failed, log the raw body so the cause is visible
+        if coins.isEmpty {
+            print("[CoinService] All coins failed to decode. Raw response:")
+            print(String(data: data, encoding: .utf8) ?? "<non-UTF8 body>")
+        }
+        return coins
     }
 
     // Fetches price history for a given coin over the requested time range
