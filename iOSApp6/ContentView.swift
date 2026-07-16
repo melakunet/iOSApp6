@@ -10,8 +10,8 @@ struct ContentView: View {
 
     var body: some View {
         if showMain {
-            // Markets screen showing live coin prices
-            CoinListView()
+            // Main app with tab navigation
+            MainTabView()
         } else {
             // Pass a closure so LandingView can trigger the transition
             LandingView {
