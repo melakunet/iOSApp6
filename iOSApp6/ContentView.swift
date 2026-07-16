@@ -13,7 +13,7 @@ struct ContentView: View {
             // Placeholder until the real Markets screen is built
             ZStack {
                 LinearGradient(
-                    colors: [.black, Color.indigo],
+                    colors: [Color(red: 0.05, green: 0.0, blue: 0.2), Color.indigo],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -45,12 +45,6 @@ struct LandingView: View {
     @State private var floatOffset: CGFloat = 0
     // Shadow radius for the pulsing yellow glow on the coin
     @State private var glowRadius: CGFloat = 20
-    // Opacity for the title and subtitle fade-in
-    @State private var titleOpacity: Double = 0
-    // Vertical offset for the title slide-up animation
-    @State private var titleOffset: CGFloat = 30
-    // Opacity for the Get Started button fade-in
-    @State private var buttonOpacity: Double = 0
     // Scale factor for the button pulse animation
     @State private var buttonScale: CGFloat = 1.0
 
@@ -70,15 +64,15 @@ struct LandingView: View {
                     .font(.system(size: 110))
                     .foregroundStyle(.yellow)
                     .shadow(color: .yellow.opacity(0.6), radius: glowRadius, x: 0, y: 0)
-                    .rotation3DEffect(.degrees(spinAngle), axis: (x: 0, y: 1, z: 0))
+                    .rotationEffect(.degrees(spinAngle))
                     .offset(y: floatOffset)
                     .onAppear {
-                        // Spin two full rotations over 2 seconds
-                        withAnimation(.linear(duration: 2)) {
-                            spinAngle = 720
+                        // Spin once on appear (flat 2D rotation so coin stays fully visible)
+                        withAnimation(.linear(duration: 1.5)) {
+                            spinAngle = 360
                         }
-                        // After the spin finishes, start a gentle float and glow pulse
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        // After the spin, start a gentle float and glow pulse forever
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                             withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) {
                                 floatOffset = -12
                                 glowRadius = 36
@@ -86,26 +80,17 @@ struct LandingView: View {
                         }
                     }
 
-                // App name fades in and slides up after a short delay
+                // App name — always visible, slides up from a slight offset on appear
                 Text("CoinWatch")
                     .font(.system(.largeTitle, design: .rounded, weight: .bold))
                     .foregroundStyle(.white)
-                    .opacity(titleOpacity)
-                    .offset(y: titleOffset)
-                    .onAppear {
-                        withAnimation(.easeOut(duration: 1).delay(0.6)) {
-                            titleOpacity = 1
-                            titleOffset = 0
-                        }
-                    }
 
-                // Subtitle shares opacity so it fades in with the title
+                // Subtitle — always visible below the title
                 Text("Live crypto prices")
                     .font(.subheadline)
                     .foregroundStyle(.gray)
-                    .opacity(titleOpacity)
 
-                // Get Started button fades in after the title and pulses to invite a tap
+                // Get Started button — always visible, pulses to invite a tap
                 Button(action: onStart) {
                     Text("Get Started")
                         .font(.headline.bold())
@@ -115,17 +100,10 @@ struct LandingView: View {
                         .background(Capsule().fill(.yellow))
                 }
                 .scaleEffect(buttonScale)
-                .opacity(buttonOpacity)
                 .onAppear {
-                    // Fade the button in slightly after the title finishes
-                    withAnimation(.easeOut(duration: 0.8).delay(1.8)) {
-                        buttonOpacity = 1
-                    }
-                    // Start the scale pulse once the button is fully visible
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) {
-                        withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
-                            buttonScale = 1.06
-                        }
+                    // Start a gentle scale pulse so the button draws attention
+                    withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
+                        buttonScale = 1.06
                     }
                 }
             }
